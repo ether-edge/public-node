@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"time"
+    "os"
 
 	"fileUpload/internal/config"
 	"fileUpload/internal/handlers"
@@ -12,6 +13,12 @@ import (
 
 
 func main() {
+    port := "40252"
+
+	// if !config.IsPortAvailable(port) {
+	// 	fmt.Println("Port", port, "is occupied. Exiting.")
+	// 	os.Exit(1)
+	// }
 
 	config.GetInputForAPISection()
 
@@ -27,5 +34,9 @@ func main() {
 	app.Get("/download/:filename", handlers.DownloadFileHandler)
 
 	fmt.Println("Server is running on port 40252...")
-	app.Listen(":40252")
+	err := app.Listen(":" + port)
+	if err != nil {
+		fmt.Println("Error starting the server:", err)
+		os.Exit(1)
+	}
 }

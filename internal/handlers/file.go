@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-
+	"github.com/joho/godotenv"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -40,6 +40,16 @@ func CreateFileHandler(c *fiber.Ctx) error {
 
 
 func DownloadFileHandler(c *fiber.Ctx) error {
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Println("Warning: Could not load .env file, using default values")
+	}
+
+	baseURL := os.Getenv("base_URL")
+	if baseURL == "" {
+		baseURL = "http://localhost:3000"
+	}
+
 	fileName := c.Params("filename")
 	filePath := fmt.Sprintf("uploads/%s", fileName)
 
@@ -48,8 +58,9 @@ func DownloadFileHandler(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "File not found"})
 	}
 
-	fmt.Println("Sending file:", filePath)
-	return c.SendFile(filePath)
+	downloadURL := fmt.Sprintf("%s/download/%s", baseURL, fileName)
+
+	return c.SendFile(downloadURL)
 }
 
 func TestHandler(c *fiber.Ctx) error {
