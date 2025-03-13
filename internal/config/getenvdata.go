@@ -4,7 +4,8 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	
+    "net"
+
 	"strings"
 )
 
@@ -91,4 +92,14 @@ func writeToEnvFile(apiValues map[string]string) {
 			return
 		}
 	}
+}
+
+func IsPortAvailable(port string) bool {
+	listener, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		fmt.Println("Port", port, "is already in use.")
+		return false
+	}
+	defer listener.Close()
+	return true
 }
