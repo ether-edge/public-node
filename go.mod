@@ -1,4 +1,4 @@
-module fileUpload
+module public-node
 
 go 1.23.1
 

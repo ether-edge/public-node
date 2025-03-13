@@ -5,8 +5,8 @@ import (
 	"time"
     "os"
 
-	"fileUpload/internal/config"
-	"fileUpload/internal/handlers"
+	"public-node/internal/config"
+	"public-node/internal/handlers"
 
 	"github.com/gofiber/fiber/v2"
 )
