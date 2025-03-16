@@ -2,11 +2,16 @@ package config
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"log"
+	"net"
+	"net/http"
 	"os"
-    "net"
-
 	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 func GetInputForAPISection() map[string]string {
@@ -30,6 +35,7 @@ func GetInputForAPISection() map[string]string {
 		apiValues["base_URL"] = promptInput("base_URL", existingValues)
 
 		writeToEnvFile(apiValues)
+
 	} else {
 		apiValues = existingValues
 	}
@@ -92,6 +98,84 @@ func writeToEnvFile(apiValues map[string]string) {
 			return
 		}
 	}
+}
+func MakeAPICall() (bool, error) {
+
+	url := "http://127.0.0.1:8080/node-status" // API URL
+
+	license := GetEnvData("license") 
+	if license == "" {
+		return false, fmt.Errorf("license not found in environment variables")
+	}
+
+	apiValuesWithLicense := map[string]string{
+		"license": license,
+	}
+
+	reqBody, err := json.Marshal(apiValuesWithLicense)
+	if err != nil {
+		return false, fmt.Errorf("error encoding JSON: %v", err)
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return false, fmt.Errorf("error creating request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("error making request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("API call failed with status: %d", resp.StatusCode) // Todo :: change This massage 
+	}
+
+	var response map[string]interface{} 
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		return false, fmt.Errorf("error decoding API response: %v", err)
+	}
+
+	success, exists := response["status"]
+	if !exists {
+		return false, fmt.Errorf("invalid API response format: no 'status' field found")
+	}
+
+	if status, ok := success.(bool); ok {
+		return status, nil
+	} else {
+		return false, fmt.Errorf("'status' field is not a boolean in the response")
+	}
+}
+
+func LoadEnv() error {
+	// Load .env file
+	err := godotenv.Load(".env")
+	if err != nil {
+		return fmt.Errorf("Error loading .env file")
+	}
+	return nil
+}
+
+// GetEnvData retrieves the value of an environment variable
+func GetEnvData(varName string) string {
+	// Load environment variables from the .env file if not already loaded
+	if err := LoadEnv(); err != nil {
+		log.Fatal(err)
+	}
+
+	// Retrieve the environment variable by name
+	value := os.Getenv(varName)
+
+	if value == "" {
+		fmt.Printf("Environment variable %s is not set\n", varName)
+	}
+
+	return value
 }
 
 func IsPortAvailable(port string) bool {
