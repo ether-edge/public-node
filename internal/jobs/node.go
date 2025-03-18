@@ -3,30 +3,24 @@ package jobs
 import (
 	"fmt"
 	"public-node/internal/handlers"
-	"sync"
 
 	"gopkg.in/robfig/cron.v2"
 )
 
-var (
-	cronScheduler *cron.Cron
-	once          sync.Once
-)
 
-func RunCronJobsStarted() {
-	once.Do(func() { 
-		cronScheduler = cron.New()
+func RunCronJobsStarted() *cron.Cron {
+	c := cron.New()
 
-		cronScheduler.AddFunc("@every 1m", func() {
-			response, err := handlers.SendPostRequest()
-			if err != nil {
-				fmt.Println("Error:", err)
-			} else {
-				fmt.Println("Response:", response)
-			}
-		})
+	// Schedule the task to run every 10 seconds
+	_, err := c.AddFunc("*/10 * * * * *", handlers.SendPostRequest)
+	if err != nil {
+		fmt.Println("Error scheduling cron job:", err)
+		return nil
+	}
 
-		cronScheduler.Start()
-		fmt.Println("Cron jobs started.")
-	})
+	// Start the cron scheduler
+	c.Start()
+	fmt.Println("Cron started...")
+
+	return c
 }
