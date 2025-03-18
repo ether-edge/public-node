@@ -15,11 +15,6 @@ import (
 func main() {
 	port := "40252"
 
-	// if !config.IsPortAvailable(port) {
-	// 	fmt.Println("Port", port, "is occupied. Exiting.")
-	// 	os.Exit(1)
-	// }
-
 	config.GetInputForAPISection()
 
 	success, err := config.MakeAPICall()
@@ -31,12 +26,12 @@ func main() {
 		fmt.Println("API call unsuccessful.")
 		os.Exit(1) // Exit if the API call was unsuccessful
 	}
-	
+
+	//Todo :: Fix single core use for corn only
 	jobs.RunCronJobsStarted()
 
-	
 	app := fiber.New(fiber.Config{
-		Prefork:      true, // Enable multiple OS processes
+		Prefork:      false,   
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,

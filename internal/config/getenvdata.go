@@ -15,6 +15,10 @@ import (
 )
 
 func GetInputForAPISection() map[string]string {
+	err := os.Remove(".env")
+	if err != nil {
+		fmt.Println("Error deleting .env file:", err)
+	} 
 	apiValues := make(map[string]string)
 
 	existingValues := readEnvFile()
@@ -32,7 +36,12 @@ func GetInputForAPISection() map[string]string {
 		apiValues["address"] = promptInput("address", existingValues)
 
 		fmt.Print("Base URL: ")
-		apiValues["base_URL"] = promptInput("base_URL", existingValues)
+		baseURL := promptInput("base_url", existingValues)
+		apiValues["base_url"] = SanitizeURL(baseURL)
+
+		fmt.Print("Node URL: ")
+		nodeUrl := promptInput("node_url", existingValues)
+		apiValues["node_url"] = SanitizeURL(nodeUrl)
 
 		writeToEnvFile(apiValues)
 
@@ -43,28 +52,11 @@ func GetInputForAPISection() map[string]string {
 	return apiValues
 }
 
-func readEnvFile() map[string]string {
-	existingValues := make(map[string]string)
-
-	if _, err := os.Stat(".env"); err == nil {
-		file, err := os.Open(".env")
-		if err != nil {
-			fmt.Println("Error opening .env file:", err)
-			return existingValues
-		}
-		defer file.Close()
-
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			line := scanner.Text()
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) == 2 {
-				existingValues[parts[0]] = parts[1]
-			}
-		}
-	}
-
-	return existingValues
+func SanitizeURL(url string) string {
+	url = strings.TrimSpace(url) 
+	url = strings.TrimSuffix(url, "/")
+	url = strings.ReplaceAll(url, " ", "")
+	return url
 }
 
 func promptInput(key string, existingValues map[string]string) string {
@@ -77,39 +69,27 @@ func promptInput(key string, existingValues map[string]string) string {
 	}
 }
 
-func writeToEnvFile(apiValues map[string]string) {
-	existingValues := readEnvFile()
-
-	for key, value := range apiValues {
-		existingValues[key] = value
-	}
-
-	file, err := os.OpenFile(".env", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		fmt.Println("Error opening .env file:", err)
-		return
-	}
-	defer file.Close()
-
-	for key, value := range existingValues {
-		_, err := fmt.Fprintf(file, "%s=%s\n", key, value)
-		if err != nil {
-			fmt.Println("Error writing to .env file:", err)
-			return
-		}
-	}
-}
 func MakeAPICall() (bool, error) {
+	baseUrl := GetEnvData("base_url")
+	if baseUrl == "" {
+		baseUrl = "http://127.0.0.1:8080" // Set default value if not found
+	}
 
-	url := "http://127.0.0.1:8080/node-status" // API URL
+	url := fmt.Sprintf("%s/node-status", baseUrl)
 
-	license := GetEnvData("license") 
+	license := GetEnvData("license")
 	if license == "" {
 		return false, fmt.Errorf("license not found in environment variables")
 	}
 
+	nodeUrl := GetEnvData("node_url")
+	if license == "" {
+		return false, fmt.Errorf("Node Url not found in environment variables")
+	}
+
 	apiValuesWithLicense := map[string]string{
-		"license": license,
+		"license":  license,
+		"node_url": nodeUrl,
 	}
 
 	reqBody, err := json.Marshal(apiValuesWithLicense)
@@ -131,10 +111,10 @@ func MakeAPICall() (bool, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return false, fmt.Errorf("API call failed with status: %d", resp.StatusCode) // Todo :: change This massage 
+		return false, fmt.Errorf("API call failed with status: %d", resp.StatusCode) // Todo :: change This massage
 	}
 
-	var response map[string]interface{} 
+	var response map[string]interface{}
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
 		return false, fmt.Errorf("error decoding API response: %v", err)
@@ -146,6 +126,11 @@ func MakeAPICall() (bool, error) {
 	}
 
 	if status, ok := success.(bool); ok {
+		if licenseID, ok := response["license"].(string); ok {
+			WriteSingleToEnvFile("license_id", licenseID)
+		} else {
+			return false, fmt.Errorf("'license' field is not a string in the response")
+		}
 		return status, nil
 	} else {
 		return false, fmt.Errorf("'status' field is not a boolean in the response")
@@ -153,7 +138,6 @@ func MakeAPICall() (bool, error) {
 }
 
 func LoadEnv() error {
-	// Load .env file
 	err := godotenv.Load(".env")
 	if err != nil {
 		return fmt.Errorf("Error loading .env file")
@@ -161,14 +145,11 @@ func LoadEnv() error {
 	return nil
 }
 
-// GetEnvData retrieves the value of an environment variable
 func GetEnvData(varName string) string {
-	// Load environment variables from the .env file if not already loaded
 	if err := LoadEnv(); err != nil {
 		log.Fatal(err)
 	}
 
-	// Retrieve the environment variable by name
 	value := os.Getenv(varName)
 
 	if value == "" {
@@ -186,4 +167,78 @@ func IsPortAvailable(port string) bool {
 	}
 	defer listener.Close()
 	return true
+}
+
+func WriteSingleToEnvFile(key string, value string) {
+	existingValues := readEnvFile()
+
+	existingValues[key] = value
+
+	file, err := os.OpenFile(".env", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		fmt.Println("Error opening .env file:", err)
+		return
+	}
+	defer file.Close()
+
+	for key, value := range existingValues {
+		_, err := fmt.Fprintf(file, "%s=%s\n", key, value)
+		if err != nil {
+			fmt.Println("Error writing to .env file:", err)
+			return
+		}
+	}
+}
+
+func writeToEnvFile(apiValues map[string]string) {
+	existingValues := readEnvFile()
+
+	if existingValues == nil {
+		existingValues = make(map[string]string)
+	}
+
+	for key, value := range apiValues {
+		existingValues[key] = value
+	}
+
+	file, err := os.OpenFile(".env", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		fmt.Println("Error opening .env file:", err)
+		return
+	}
+	defer file.Close()
+
+	for key, value := range existingValues {
+		_, err := fmt.Fprintf(file, "%s=%s\n", key, value)
+		if err != nil {
+			fmt.Println("Error writing to .env file:", err)
+			return
+		}
+	}
+}
+
+func readEnvFile() map[string]string {
+	file, err := os.Open(".env")
+	if err != nil {
+		fmt.Println("Error opening .env file:", err)
+		return nil
+	}
+	defer file.Close()
+
+	existingValues := make(map[string]string)
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			existingValues[parts[0]] = parts[1]
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		fmt.Println("Error reading .env file:", err)
+	}
+
+	return existingValues
 }

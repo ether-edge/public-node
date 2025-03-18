@@ -1,56 +1,61 @@
 package handlers
 
 import (
-	"encoding/json"
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
+	
+	"public-node/internal/config"
+
 )
 
-func SendPostRequest() (string, error) {
+func SendPostRequest() {
+	baseUrl := config.GetEnvData("base_url")
+	if baseUrl == "" {
+		baseUrl = "http://127.0.0.1:8080" // Set default value if not found
+	}
 
-	apiURL := "http://127.0.0.1:8080/api/public-node-activity/store"
+	apiURL := fmt.Sprintf("%s/api/public-node-activity/store", baseUrl)
 
 	formValues := url.Values{}
-	formValues.Set("LicenseID", "a4e35532-9c6a-4b65-8ec0-0c9a39436e0b")
+	formValues.Set("LicenseID",config.GetEnvData("license_id"))
 	formValues.Set("ActivityDate", time.Now().Format("2006-01-02"))
 	formValues.Set("HoursOnline", strconv.Itoa(1))
 
-	payload := strings.NewReader(formValues.Encode())
+	payload := bytes.NewBufferString(formValues.Encode())
 
 	req, err := http.NewRequest("POST", apiURL, payload)
 	if err != nil {
-		return "", fmt.Errorf("error creating POST request: %v", err)
+		fmt.Println("Error creating POST request:", err)
+		return
 	}
-
+	
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("License", config.GetEnvData("license"))
+	req.Header.Set("Api-Key", config.GetEnvData("api_key"))
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("error making POST request: %v", err)
+		fmt.Println("Error making POST request:", err)
+		return
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("error reading response: %v", err)
+		fmt.Println("Error reading response:", err)
+		return
 	}
 
 	if resp.StatusCode != http.StatusCreated {
-		return "", fmt.Errorf("POST request failed with status: %d", resp.StatusCode)
+		fmt.Printf("POST request failed with status: %d, response: %s\n", resp.StatusCode, body)
+		return
 	}
 
-	var response map[string]interface{}
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		return "", fmt.Errorf("error decoding API response: %v", err)
-	}
-
-	return string(body), nil
+	// fmt.Println("POST request successful:", string(body))
 }
-
