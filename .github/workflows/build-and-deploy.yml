@@ -6,8 +6,7 @@ on:
       - main  # Runs when code is pushed to the main branch
 
 permissions:
-  deployments: read|write|none
-
+  contents: write  # Allows pushing code to the repository
 
 jobs:
   build:
@@ -20,7 +19,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.23.1  # Match with your Go version
+          go-version: 1.23.1
 
       - name: Build Project
         run: go build -o public-code
@@ -33,8 +32,7 @@ jobs:
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
       - name: Test SSH connection
-        run: |
-          ssh -T git@github.com
+        run: ssh -o StrictHostKeyChecking=no -T git@github.com || true
 
       - name: Deploy to deploy branch
         run: |
@@ -43,4 +41,4 @@ jobs:
           git checkout -B deploy
           git add public-code
           git commit -m "Deploy new build"
-          git push --force git@github.com:ether-edge/public-node.git deploy
+          git push --set-upstream git@github.com:ether-edge/public-node.git deploy --force
