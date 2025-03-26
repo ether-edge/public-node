@@ -3,11 +3,7 @@ name: Go Build & Deploy
 on:
   push:
     branches:
-      - main  # Runs when code is pushed to the main branch
-
-permissions:
-  contents: write   # Allows writing access to repository contents (for pushing commits)
-  issues: read      # Allows reading access to issues (optional, if you plan to interact with issues)
+      - main
 
 jobs:
   build:
@@ -20,7 +16,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.23.1  # Match with your Go version
+          go-version: 1.23.1
 
       - name: Build Project
         run: go build -o public-code
@@ -32,9 +28,11 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
+      - name: Test SSH connection
+        run: |
+          ssh -T git@github.com
+
       - name: Deploy to deploy branch
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Automatically provided by GitHub
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
