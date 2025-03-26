@@ -6,9 +6,6 @@ on:
       - main  # Runs when code is pushed to the main branch
 
 permissions:
-  contents: write  # Allows workflows to write to repository contents
-  issues: read     # Allows workflows to read issue data (optional, if you need it)
-  pull-requests: write  # Allows workflows to manage pull requests
   deployments: read|write|none
 
 
