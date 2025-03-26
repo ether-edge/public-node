@@ -24,11 +24,6 @@ jobs:
       - name: Build Project
         run: go build -o public-code
 
-      - name: Stash Untracked Files
-        run: |
-          git add public-code
-          git commit -m "Save build output before switching branches" || echo "No changes to commit"
-
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -39,11 +34,27 @@ jobs:
       - name: Test SSH connection
         run: ssh -o StrictHostKeyChecking=no -T git@github.com || true
 
-      - name: Deploy to deploy branch
+      - name: Stash Changes Before Switching Branch
         run: |
-          git fetch origin deploy || git branch deploy origin/deploy || git checkout -B deploy
-          git checkout deploy
-          git reset --hard origin/deploy || echo "No remote branch yet"
+          git add public-code
+          git commit -m "Save build output before switching branches" || echo "No changes to commit"
+          git stash
+
+      - name: Checkout Deploy Branch
+        run: |
+          git fetch origin deploy || true
+          if git show-ref --verify --quiet refs/remotes/origin/deploy; then
+            git checkout deploy
+            git reset --hard origin/deploy
+          else
+            git checkout -B deploy
+          fi
+
+      - name: Restore Stashed Changes
+        run: git stash pop || echo "Nothing to restore"
+
+      - name: Deploy to Deploy Branch
+        run: |
           git add public-code
           git commit -m "Deploy new build" || echo "No changes to commit"
-          git push --set-upstream git@github.com:ether-edge/public-node.git deploy --force
+          git push --force git@github.com:ether-edge/public-node.git deploy
