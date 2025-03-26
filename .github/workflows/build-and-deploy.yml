@@ -21,11 +21,18 @@ jobs:
       - name: Build Project
         run: go build -o public-node
 
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ACTIONS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
       - name: Deploy to deploy branch
         run: |
-          git config --global user.name "dipto0079"
-          git config --global user.email "sudiptobiswas423@gmail.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -B deploy
           git add public-node
           git commit -m "Deploy new build"
-          git push --force origin deploy
+          git push --force git@github.com:ether-edge/public-node.git deploy
