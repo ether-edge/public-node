@@ -3,7 +3,12 @@ name: Go Build & Deploy
 on:
   push:
     branches:
-      - main
+      - main  # Runs when code is pushed to the main branch
+
+permissions:
+  contents: write  # Allows workflows to write to repository contents
+  issues: read     # Allows workflows to read issue data (optional, if you need it)
+  pull-requests: write  # Allows workflows to manage pull requests
 
 jobs:
   build:
@@ -16,10 +21,10 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.23.1
+          go-version: 1.23.1  # Match with your Go version
 
       - name: Build Project
-        run: go build -o public-node
+        run: go build -o public-code
 
       - name: Setup SSH
         run: |
@@ -28,11 +33,15 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
+      - name: Test SSH connection
+        run: |
+          ssh -T git@github.com
+
       - name: Deploy to deploy branch
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
           git checkout -B deploy
-          git add public-node
+          git add public-code
           git commit -m "Deploy new build"
           git push --force git@github.com:ether-edge/public-node.git deploy
