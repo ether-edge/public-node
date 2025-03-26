@@ -3,10 +3,10 @@ name: Go Build & Deploy
 on:
   push:
     branches:
-      - main  # Runs when code is pushed to the main branch
+      - main
 
 permissions:
-  contents: write  # Allows pushing code to the repository
+  contents: write
 
 jobs:
   build:
@@ -15,11 +15,13 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.23.1
+          go-version: "1.23.1"  # Added quotes for version
 
       - name: Build Project
         run: go build -o public-code
@@ -31,14 +33,15 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
-      - name: Test SSH connection
-        run: ssh -o StrictHostKeyChecking=no -T git@github.com || true
+      - name: Configure Git
+        run: |
+          git config --global user.name "dipto0079"
+          git config --global user.email "actions@github.com"
 
       - name: Deploy to deploy branch
         run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git checkout -B deploy
+          git remote set-url origin git@github.com:ether-edge/public-node.git
+          git checkout -b deploy
           git add public-code
-          git commit -m "Deploy new build"
-          git push --set-upstream git@github.com:ether-edge/public-node.git deploy --force
+          git commit -m "Deploy new build [skip ci]"
+          git push origin deploy --force
