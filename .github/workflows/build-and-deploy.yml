@@ -3,10 +3,10 @@ name: Go Build & Deploy
 on:
   push:
     branches:
-      - main
+      - main  # Runs when code is pushed to the main branch
 
 permissions:
-  contents: write
+  contents: write  # Allows pushing code to the repository
 
 jobs:
   build:
@@ -15,16 +15,19 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23.1"  # Added quotes for version
+          go-version: 1.22.0  # Use a stable version of Go
 
       - name: Build Project
         run: go build -o public-code
+
+      - name: Stash Untracked Files
+        run: |
+          git add public-code
+          git commit -m "Save build output before switching branches" || echo "No changes to commit"
 
       - name: Setup SSH
         run: |
@@ -33,15 +36,14 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
-      - name: Configure Git
-        run: |
-          git config --global user.name "dipto0079"
-          git config --global user.email "actions@github.com"
+      - name: Test SSH connection
+        run: ssh -o StrictHostKeyChecking=no -T git@github.com || true
 
       - name: Deploy to deploy branch
         run: |
-          git remote set-url origin git@github.com:ether-edge/public-node.git
+          git fetch origin deploy || git branch deploy origin/deploy || git checkout -B deploy
           git checkout deploy
+          git reset --hard origin/deploy || echo "No remote branch yet"
           git add public-code
-          git commit -m "Deploy new build [skip ci]"
-          git push origin deploy --force
+          git commit -m "Deploy new build" || echo "No changes to commit"
+          git push --set-upstream git@github.com:ether-edge/public-node.git deploy --force
