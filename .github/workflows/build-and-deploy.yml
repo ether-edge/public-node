@@ -23,9 +23,7 @@ jobs:
 
       - name: Deploy to deploy branch
         run: |
-          git config --global user.name "dipto0079"
-          git config --global user.email "sudiptobiswas423@gmail.com"
           git checkout -B deploy
           git add public-code
           git commit -m "Deploy new build"
-          git push --force origin deploy
+          git push --force https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/ether-edge/public-node.git deploy
