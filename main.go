@@ -15,7 +15,7 @@ import (
 func main() {
 	port := "40252"
 
-	config.GetInputForAPISection()
+	config.GetInput()
 
 	success, err := config.MakeAPICall()
 	if err != nil {
