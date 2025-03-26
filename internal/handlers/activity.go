@@ -14,17 +14,14 @@ import (
 )
 
 func SendPostRequest() {
-	baseUrl := config.GetEnvData("base_url")
-	if baseUrl == "" {
-		baseUrl = "http://127.0.0.1:8080" // Set default value if not found
-	}
-
+	baseUrl := config.GetEnvData("BASE_URL")
+	
 	apiURL := fmt.Sprintf("%s/api/public-node-activity/store", baseUrl)
 
 	formValues := url.Values{}
-	formValues.Set("LicenseID",config.GetEnvData("license_id"))
+	formValues.Set("LicenseID",config.GetEnvData("LICENSE_ID"))
 	formValues.Set("ActivityDate", time.Now().Format("2006-01-02"))
-	formValues.Set("HoursOnline", strconv.Itoa(1))
+	formValues.Set("HoursOnline", strconv.Itoa(1)) //TODO:: Add to env to set time
 
 	payload := bytes.NewBufferString(formValues.Encode())
 
@@ -35,8 +32,8 @@ func SendPostRequest() {
 	}
 	
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("License", config.GetEnvData("license"))
-	req.Header.Set("Api-Key", config.GetEnvData("api_key"))
+	req.Header.Set("License", config.GetEnvData("LICENSE"))
+	req.Header.Set("Api-Key", config.GetEnvData("API_KEY"))
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -57,5 +54,4 @@ func SendPostRequest() {
 		return
 	}
 
-	// fmt.Println("POST request successful:", string(body))
 }

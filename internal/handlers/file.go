@@ -45,7 +45,7 @@ func DownloadFileHandler(c *fiber.Ctx) error {
 		fmt.Println("Warning: Could not load .env file, using default values")
 	}
 
-	baseURL := os.Getenv("base_URL")
+	baseURL := os.Getenv("BASE_URL")
 	if baseURL == "" {
 		baseURL = "http://localhost:3000"
 	}

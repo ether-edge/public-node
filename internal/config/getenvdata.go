@@ -5,51 +5,205 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"strings"
 
-	"github.com/joho/godotenv"
 )
 
-func GetInputForAPISection() map[string]string {
-	err := os.Remove(".env")
-	if err != nil {
-		fmt.Println("Error deleting .env file:", err)
-	} 
+func GetInput() map[string]string {
 	apiValues := make(map[string]string)
+	scanner := bufio.NewScanner(os.Stdin)
 
-	existingValues := readEnvFile()
+	fmt.Println("Enter your Node credentials")
 
-	if existingValues["license"] == "" {
-		fmt.Println("Enter your Node credentials")
+	fmt.Print("Address: ")
+	scanner.Scan()
+	apiValues["address"] = scanner.Text()
 
-		fmt.Print("License: ")
-		apiValues["license"] = promptInput("license", existingValues)
+	fmt.Print("License: ")
+	scanner.Scan()
+	apiValues["license"] = scanner.Text()
 
-		fmt.Print("API Key: ")
-		apiValues["api_key"] = promptInput("api_key", existingValues)
+	fmt.Print("API key: ")
+	scanner.Scan()
+	apiValues["api_key"] = scanner.Text()
 
-		fmt.Print("Address: ")
-		apiValues["address"] = promptInput("address", existingValues)
 
-		fmt.Print("Base URL: ")
-		baseURL := promptInput("base_url", existingValues)
-		apiValues["base_url"] = SanitizeURL(baseURL)
+	fmt.Print("NODE URL: ")
+	scanner.Scan()
+	apiValues["node_url"] = SanitizeURL(scanner.Text())
 
-		fmt.Print("Node URL: ")
-		nodeUrl := promptInput("node_url", existingValues)
-		apiValues["node_url"] = SanitizeURL(nodeUrl)
 
-		writeToEnvFile(apiValues)
+	fmt.Print("BASE URL: ")
+	scanner.Scan()
+	apiValues["base_url"] = SanitizeURL(scanner.Text())
 
-	} else {
-		apiValues = existingValues
-	}
+	setLinuxEnvironmentVariables(apiValues)
 
 	return apiValues
+}
+
+func setLinuxEnvironmentVariables(apiValues map[string]string) {
+	unsetEnvIfExists("ADDRESS")
+	unsetEnvIfExists("LICENSE")
+	unsetEnvIfExists("API_KEY")
+	unsetEnvIfExists("NODE_URL")
+	unsetEnvIfExists("BASE_URL")
+	
+	os.Setenv("ADDRESS", apiValues["address"])
+	os.Setenv("LICENSE", apiValues["license"])
+	os.Setenv("API_KEY", apiValues["api_key"])
+	os.Setenv("NODE_URL", apiValues["node_url"])
+	os.Setenv("BASE_URL", apiValues["base_url"])
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Println("❌ Error getting home directory:", err)
+		return
+	}
+
+	bashrcFile := homeDir + "/.bashrc"
+
+	file, err := os.OpenFile(bashrcFile, os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		fmt.Println("❌ Error opening .bashrc:", err)
+		return
+	}
+	defer file.Close()
+
+	_, err = fmt.Fprintf(file, "\n# Added by Go program\nexport ADDRESS=%s\nexport LICENSE=%s\nexport API_KEY=%s\nexport NODE_URL=%s\nexport BASE_URL=%s\n",
+	apiValues["address"], apiValues["license"], apiValues["api_key"], apiValues["node_url"], apiValues["base_url"])
+if err != nil {
+	fmt.Println("❌ Error appending to .bashrc:", err)
+	return
+}
+
+}
+
+
+func unsetEnvIfExists(key string) {
+	if _, exists := os.LookupEnv(key); exists {
+		os.Unsetenv(key)
+		fmt.Printf("❌ Unset %s from current session\n", key)
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Println("❌ Error getting home directory:", err)
+		return
+	}
+	bashrcFile := homeDir + "/.bashrc"
+
+	content, err := ioutil.ReadFile(bashrcFile)
+	if err != nil {
+		fmt.Println("❌ Error reading .bashrc:", err)
+		return
+	}
+
+	lines := strings.Split(string(content), "\n")
+	var newLines []string
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "export "+key+"=") {
+			continue
+		}
+		newLines = append(newLines, line)
+	}
+
+	updatedContent := strings.Join(newLines, "\n")
+	err = ioutil.WriteFile(bashrcFile, []byte(updatedContent), 0644)
+	if err != nil {
+		fmt.Println("❌ Error updating .bashrc:", err)
+		return
+	}
+}
+
+
+func GetEnvData(varName string) string {
+	
+	envVars := GetBashrcEnv()
+
+	value := "not set"
+
+	if val, exists := envVars[varName]; exists {
+		value = val
+	}
+
+	return value
+}
+
+func GetBashrcEnv() map[string]string {
+	envData := make(map[string]string)
+	file, err := os.Open(os.Getenv("HOME") + "/.bashrc")
+	if err != nil {
+		fmt.Println("Error opening .bashrc:", err)
+		return envData
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "export ") {
+			parts := strings.SplitN(strings.TrimPrefix(line, "export "), "=", 2)
+			if len(parts) == 2 {
+				envData[parts[0]] = strings.Trim(parts[1], `"`)
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		fmt.Println("Error reading .bashrc:", err)
+	}
+
+	return envData
+}
+
+func IsPortAvailable(port string) bool {
+	listener, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		fmt.Println("Port", port, "is already in use.")
+		return false
+	}
+	defer listener.Close()
+	return true
+}
+
+func WriteSingleToBashrc(key string, value string) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Println("❌ Error getting home directory:", err)
+		return
+	}
+
+	bashrcFile := homeDir + "/.bashrc"
+
+	content, err := ioutil.ReadFile(bashrcFile)
+	if err != nil {
+		fmt.Println("❌ Error reading .bashrc:", err)
+		return
+	}
+
+	lines := strings.Split(string(content), "\n")
+	var newLines []string
+	keyPrefix := "export " + key + "="
+
+	for _, line := range lines {
+		if !strings.HasPrefix(line, keyPrefix) {
+			newLines = append(newLines, line)
+		}
+	}
+
+	newLines = append(newLines, keyPrefix+value)
+
+	updatedContent := strings.Join(newLines, "\n")
+
+	err = ioutil.WriteFile(bashrcFile, []byte(updatedContent), 0644)
+	if err != nil {
+		fmt.Println("❌ Error writing to .bashrc:", err)
+		return
+	}
 }
 
 func SanitizeURL(url string) string {
@@ -59,21 +213,8 @@ func SanitizeURL(url string) string {
 	return url
 }
 
-func promptInput(key string, existingValues map[string]string) string {
-	if value, exists := existingValues[key]; exists && value != "" {
-		return value
-	} else {
-		scanner := bufio.NewScanner(os.Stdin)
-		scanner.Scan()
-		return scanner.Text()
-	}
-}
-
 func MakeAPICall() (bool, error) {
-	baseUrl := GetEnvData("base_url")
-	if baseUrl == "" {
-		baseUrl = "http://127.0.0.1:8080" // Set default value if not found
-	}
+	baseUrl := GetEnvData("BASE_URL")
 
 	url := fmt.Sprintf("%s/node-status", baseUrl)
 
@@ -127,7 +268,7 @@ func MakeAPICall() (bool, error) {
 
 	if status, ok := success.(bool); ok {
 		if licenseID, ok := response["license"].(string); ok {
-			WriteSingleToEnvFile("license_id", licenseID)
+			WriteSingleToBashrc("LICENSE_ID", licenseID)
 		} else {
 			return false, fmt.Errorf("'license' field is not a string in the response")
 		}
@@ -135,110 +276,4 @@ func MakeAPICall() (bool, error) {
 	} else {
 		return false, fmt.Errorf("'status' field is not a boolean in the response")
 	}
-}
-
-func LoadEnv() error {
-	err := godotenv.Load(".env")
-	if err != nil {
-		return fmt.Errorf("Error loading .env file")
-	}
-	return nil
-}
-
-func GetEnvData(varName string) string {
-	if err := LoadEnv(); err != nil {
-		log.Fatal(err)
-	}
-
-	value := os.Getenv(varName)
-
-	if value == "" {
-		fmt.Printf("Environment variable %s is not set\n", varName)
-	}
-
-	return value
-}
-
-func IsPortAvailable(port string) bool {
-	listener, err := net.Listen("tcp", ":"+port)
-	if err != nil {
-		fmt.Println("Port", port, "is already in use.")
-		return false
-	}
-	defer listener.Close()
-	return true
-}
-
-func WriteSingleToEnvFile(key string, value string) {
-	existingValues := readEnvFile()
-
-	existingValues[key] = value
-
-	file, err := os.OpenFile(".env", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		fmt.Println("Error opening .env file:", err)
-		return
-	}
-	defer file.Close()
-
-	for key, value := range existingValues {
-		_, err := fmt.Fprintf(file, "%s=%s\n", key, value)
-		if err != nil {
-			fmt.Println("Error writing to .env file:", err)
-			return
-		}
-	}
-}
-
-func writeToEnvFile(apiValues map[string]string) {
-	existingValues := readEnvFile()
-
-	if existingValues == nil {
-		existingValues = make(map[string]string)
-	}
-
-	for key, value := range apiValues {
-		existingValues[key] = value
-	}
-
-	file, err := os.OpenFile(".env", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		fmt.Println("Error opening .env file:", err)
-		return
-	}
-	defer file.Close()
-
-	for key, value := range existingValues {
-		_, err := fmt.Fprintf(file, "%s=%s\n", key, value)
-		if err != nil {
-			fmt.Println("Error writing to .env file:", err)
-			return
-		}
-	}
-}
-
-func readEnvFile() map[string]string {
-	file, err := os.Open(".env")
-	if err != nil {
-		fmt.Println("Error opening .env file:", err)
-		return nil
-	}
-	defer file.Close()
-
-	existingValues := make(map[string]string)
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			existingValues[parts[0]] = parts[1]
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		fmt.Println("Error reading .env file:", err)
-	}
-
-	return existingValues
 }
