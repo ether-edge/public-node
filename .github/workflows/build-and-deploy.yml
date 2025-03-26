@@ -23,8 +23,8 @@ jobs:
 
       - name: Deploy to deploy branch
         run: |
-          git config --global user.name "ether-edge"
-          git config --global user.email "info@gtfolio.com"
+          git config --global user.name "dipto0079"
+          git config --global user.email "sudiptobiswas423@gmail.com"
           git checkout -B deploy
           git add public-node
           git commit -m "Deploy new build"
