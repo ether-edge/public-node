@@ -41,7 +41,7 @@ jobs:
       - name: Deploy to deploy branch
         run: |
           git remote set-url origin git@github.com:ether-edge/public-node.git
-          git checkout -b deploy
+          git checkout deploy
           git add public-code
           git commit -m "Deploy new build [skip ci]"
           git push origin deploy --force
