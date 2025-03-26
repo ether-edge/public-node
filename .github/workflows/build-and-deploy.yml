@@ -3,7 +3,7 @@ name: Go Build & Deploy
 on:
   push:
     branches:
-      - main
+      - main  # Runs when code is pushed to the main branch
 
 jobs:
   build:
@@ -21,27 +21,11 @@ jobs:
       - name: Build Project
         run: go build -o public-code
 
-      - name: Setup SSH
+      - name: Deploy to deploy branch
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.ACTIONS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
-
-      - name: Test SSH connection
-        run: |
-          ssh -T git@github.com
-
-      - name: Checkout deploy branch
-        run: |
-          git fetch origin
-          git checkout deploy || git checkout -b deploy
-
-      - name: Copy build to deploy branch
-        run: |
-          cp public-code /tmp/public-code
-          git checkout deploy
-          cp /tmp/public-code .
+          git config --global user.name "dipto0079"
+          git config --global user.email "sudiptobiswas423@gmail.com"
+          git checkout -B deploy
           git add public-code
           git commit -m "Deploy new build"
-          git push --force git@github.com:ether-edge/public-node.git deploy
+          git push --force origin deploy
