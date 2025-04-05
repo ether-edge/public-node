@@ -7,6 +7,10 @@ on:
 
 permissions:
   contents: write  # Allows pushing code to the repository
+  pull-requests: write
+  issues: read
+  packages: none
+
 
 jobs:
   build:
